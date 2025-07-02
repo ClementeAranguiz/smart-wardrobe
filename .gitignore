@@ -91,3 +91,6 @@ temp/
 
 python-api/venv/
 python-api/__pycache__/
+
+# PyTorch model files
+*.pth
