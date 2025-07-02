@@ -1,0 +1,29 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Reglas para imágenes del armario
+    match /wardrobe-images/{userId}/{itemId}/{fileName} {
+      // Permitir lectura si el usuario está autenticado
+      allow read: if request.auth != null;
+      
+      // Permitir escritura solo si:
+      // 1. El usuario está autenticado
+      // 2. El userId coincide con el uid del usuario autenticado
+      // 3. El archivo es una imagen
+      // 4. El archivo no es demasiado grande (10MB)
+      allow write: if request.auth != null 
+                   && request.auth.uid == userId
+                   && request.resource.contentType.matches('image/.*')
+                   && request.resource.size < 10 * 1024 * 1024;
+      
+      // Permitir eliminación solo si el usuario es el propietario
+      allow delete: if request.auth != null 
+                    && request.auth.uid == userId;
+    }
+    
+    // Denegar acceso a cualquier otra ruta
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,35 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Reglas para la colección wardrobe
+    match /wardrobe/{document} {
+      // Permitir lectura si el usuario está autenticado y el documento le pertenece
+      allow read: if request.auth != null &&
+                  request.auth.uid == resource.data.userId;
+
+      // Permitir crear documentos si el usuario está autenticado
+      allow create: if request.auth != null &&
+                    request.auth.uid == request.resource.data.userId;
+
+      // Permitir actualizar si el usuario está autenticado y el documento le pertenece
+      allow update: if request.auth != null &&
+                    request.auth.uid == resource.data.userId;
+
+      // Permitir eliminar si el usuario está autenticado y el documento le pertenece
+      allow delete: if request.auth != null &&
+                    request.auth.uid == resource.data.userId;
+    }
+
+    // Reglas para otras colecciones futuras
+    match /users/{userId} {
+      // Solo el usuario puede acceder a su propio documento
+      allow read, write: if request.auth != null &&
+                         request.auth.uid == userId;
+    }
+
+    // Denegar acceso a cualquier otra colección por defecto
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
