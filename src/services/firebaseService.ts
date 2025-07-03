@@ -33,13 +33,28 @@ import {
 } from "firebase/storage";
 import { ClothingItem } from "@/types/detections";
 
+// Validar que las variables de entorno estén configuradas
+const requiredEnvVars = [
+  'VITE_FIREBASE_API_KEY',
+  'VITE_FIREBASE_AUTH_DOMAIN',
+  'VITE_FIREBASE_PROJECT_ID',
+  'VITE_FIREBASE_STORAGE_BUCKET',
+  'VITE_FIREBASE_MESSAGING_SENDER_ID',
+  'VITE_FIREBASE_APP_ID'
+];
+
+const missingVars = requiredEnvVars.filter(varName => !import.meta.env[varName]);
+if (missingVars.length > 0) {
+  throw new Error(`Missing required environment variables: ${missingVars.join(', ')}. Please check your .env file.`);
+}
+
 const firebaseConfig = {
-  apiKey: "AIzaSyAAp1I3STC2pCuoCGj_5usRyp4gMq-s1Ek",
-  authDomain: "smart-wardrobe-7194f.firebaseapp.com",
-  projectId: "smart-wardrobe-7194f",
-  storageBucket: "smart-wardrobe-7194f.firebasestorage.app",
-  messagingSenderId: "110670341095",
-  appId: "1:110670341095:web:c378b50a85d6235a6a9342"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 const app = initializeApp(firebaseConfig);
