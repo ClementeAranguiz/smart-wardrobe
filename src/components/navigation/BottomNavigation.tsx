@@ -52,7 +52,7 @@ export const BottomNavigation: React.FC = () => {
     // Crear input de cámara dinámicamente y activarlo
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/*';
+    input.accept = 'image/*,.jfif';
     input.capture = 'environment';
     input.style.display = 'none';
 

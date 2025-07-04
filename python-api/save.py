@@ -91,6 +91,17 @@ def load_model():
         category_map = checkpoint["category_map"] #Categorías de prendas como diccionario (superior, inferior, calzado)
         nombre_map = checkpoint["nombre_map"] #Nombre en español de las prendas
       
+
+        logger.info(f"📊 Categorías: {len(classes)}\n")
+        logger.info(f"classes: {classes}\n\n")
+        logger.info(f"class2idx: {class2idx}")
+        logger.info(f"🌤️ Climas: {len(climate2idx)}\n")
+        logger.info(f"📊 Categorías: {climate2idx}\n")
+        logger.info(f"cantidadcategory_map: {len(category_map)}\n")
+        logger.info(f"category_map: {category_map}\n")
+        logger.info(f"cantidad nombre_map: {len(nombre_map)}\n")
+        logger.info(f"nombre_map: {nombre_map}\n")
+        logger.info(f"climates_matrix: {climates_matrix}\n")
         # Crear modelo custom
         model = ViTMultiTask(
             num_categories=len(classes),
@@ -259,44 +270,20 @@ def extract_clothing_colors(image: Image.Image, num_colors=3):
             "hex": "#808080",
             "frecuencia": 1.0
         }]
-    
-import cv2
-import numpy as np
-from PIL import Image
-
-def recortar_fondo_perfil_blanco(pil_img: Image.Image) -> Image.Image:
-    img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
-    gris = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    _, mask = cv2.threshold(gris, 200, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-
-    kernel = np.ones((5,5), np.uint8)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
-
-    contornos, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    contornos = sorted(contornos, key=cv2.contourArea, reverse=True)
-    x,y,w,h = cv2.boundingRect(contornos[0])
-
-    recortada = img[y:y+h, x:x+w]
-    alfa = mask[y:y+h, x:x+w]
-
-    h2, w2 = recortada.shape[:2]
-    fondo = np.ones((h2, w2, 3), dtype=np.uint8) * 255
-    for c in range(3):
-        fondo[:,:,c] = np.where(alfa==255, recortada[:,:,c], 255)
-        
-    return Image.fromarray(cv2.cvtColor(fondo, cv2.COLOR_BGR2RGB))
-
 
 def predict_clothing(image: Image.Image) -> Dict[str, Any]:
     """Predecir tipo de prenda y clima usando el modelo custom"""
     try:
         # Preprocesar imagen
         input_tensor = preprocess_image(image)
+        logger.error(f"ENTRO A predict_clothing")
         # Hacer predicción
         with torch.no_grad():
-          
+            logger.error(f"ENTRO A with torch.no_grad()")
             category_logits, climate_logits = model(input_tensor)
-          
+            logger.error(f"category_logits: {category_logits}")
+            logger.error(f"climate_logits: {climate_logits}")
+            
             # Probabilidades para categorías
             category_probs = F.softmax(category_logits, dim=-1)
             climate_probs = F.softmax(climate_logits, dim=-1)
@@ -309,7 +296,8 @@ def predict_clothing(image: Image.Image) -> Dict[str, Any]:
 
             # Crear lista de climas
             climate_names = list(climate2idx.keys())
-            
+            logger.error(f"climate_names: {climate_names}")
+
             # Devolver la mejor predicción y alternativas
             all_predictions = []
             for i in range(len(top_cat_indices[0])):
@@ -325,7 +313,7 @@ def predict_clothing(image: Image.Image) -> Dict[str, Any]:
                         "confianza": float(prob),
                         "nombre": nombre_map[class_name],
                         "categoria": categoria,
-                        "climas": []  
+                        "climas": []  # Se llenará después con los climas predichos
                     }
                     all_predictions.append(prediction)
 
@@ -353,15 +341,15 @@ def predict_clothing(image: Image.Image) -> Dict[str, Any]:
 
             # Extraer colores de la prenda
             logger.info("🎨 Extrayendo colores de la prenda...")
-            colors = extract_clothing_colors(image, num_colors=2)
-            logger.info(f"Colores extraídos: {colors}\n\n")
+            colors = extract_clothing_colors(image, num_colors=3)
+            logger.info(f"Colores extraídos: {colors}")
             # Agregar colores a todas las predicciones
             for prediction in all_predictions:
                 prediction["colores"] = colors
-            logger.info(f"Predicciones: {all_predictions}\n\n")
-            logger.info(f"Mejor predicción: {best_prediction}\n\n")
-            logger.info(f"Resultados de climas: {climate_results}\n\n")
-            logger.info(f"mejor clima: {climate_results[0] if climate_results else None}\n\n")
+            logger.info(f"Predicciones: {all_predictions}")
+            logger.info(f"Mejor predicción: {best_prediction}")
+            logger.info(f"Resultados de climas: {climate_results}")
+            logger.info(f"mejor clima: {climate_results[0] if climate_results else None}")
           
             return {
                 "predicciones": all_predictions,
@@ -520,33 +508,6 @@ async def get_test_interface():
     return HTMLResponse(content=html_content)
 
 @app.post("/predict")
-async def predict_image(file: UploadFile = File(...)):
-    """Endpoint para clasificar una imagen"""
-    try:
-        # Validar que sea una imagen
-        if not file.content_type.startswith('image/'):
-            raise HTTPException(status_code=400, detail="El archivo debe ser una imagen")
-        
-        # Leer imagen
-        image_data = await file.read()
-        image = Image.open(io.BytesIO(image_data))
-        
-        logger.info(f"📸 Procesando imagen: {file.filename}, tamaño: {image.size}")
-        
-        # Hacer predicción
-        result = predict_clothing(image)
-        
-        logger.info(f"✅ Predicción completada: {result['mejor_prediccion']['nombre'] if result['mejor_prediccion'] else 'Sin resultado'}")
-        
-        return result
-    
-    except Exception as e:
-        logger.error(f"❌ Error en predicción: {e}")
-        raise HTTPException(status_code=500, detail=f"Error procesando imagen: {str(e)}")
-    
-
-
-@app.post("/imagecut")
 async def predict_image(file: UploadFile = File(...)):
     """Endpoint para clasificar una imagen"""
     try:
