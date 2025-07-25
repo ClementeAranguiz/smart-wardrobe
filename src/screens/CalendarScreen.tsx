@@ -82,7 +82,7 @@ export const CalendarScreen: React.FC = () => {
       </div>
 
       {/* Calendar Content */}
-      <div className="flex-1 px-6 pb-6 overflow-auto">
+      <div className="flex-1 px-6 overflow-auto content-with-bottom-nav">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

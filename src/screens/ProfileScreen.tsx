@@ -50,7 +50,7 @@ export const ProfileScreen: React.FC = () => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-4 space-y-6">
+      <div className="flex-1 overflow-auto p-4 space-y-6 content-with-bottom-nav">
         {/* User Info */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}

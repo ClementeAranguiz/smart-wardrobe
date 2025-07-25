@@ -83,7 +83,7 @@ export const OutfitListScreen: React.FC<OutfitListScreenProps> = ({ onBack }) =>
       </div>
 
       {/* Content */}
-      <div className="flex-1 px-6 pb-6 overflow-hidden">
+      <div className="flex-1 px-6 overflow-hidden content-with-bottom-nav">
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -121,7 +121,7 @@ export const OutfitListScreen: React.FC<OutfitListScreenProps> = ({ onBack }) =>
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
-            className="h-full overflow-auto"
+            className="h-full overflow-auto content-with-bottom-nav"
           >
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <AnimatePresence>

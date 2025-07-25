@@ -179,7 +179,7 @@ export const HomeScreen: React.FC = () => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto content-with-bottom-nav">
         {error && (
           <div className="p-4">
             <div className="p-4 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md">

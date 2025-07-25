@@ -90,7 +90,7 @@ export const RegisterUsageScreen: React.FC<RegisterUsageScreenProps> = ({ onBack
       </div>
 
       {/* Content */}
-      <div className="flex-1 px-6 pb-6 overflow-auto space-y-6">
+      <div className="flex-1 px-6 overflow-auto space-y-6 content-with-bottom-nav">
         {/* Selector de outfit */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}

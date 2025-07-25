@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, RefreshCw, Sun, Cloud, CloudRain, Snowflake, Thermometer } from 'lucide-react';
+import { MapPin, RefreshCw, Sun, Cloud, CloudRain, Snowflake, Thermometer, Edit3, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ClothingCard } from '@/components/cards/ClothingCard';
 import { WeatherStatus } from '@/components/ui/weather-status';
+import { WeatherSettingsModal } from '@/components/ui/weather-settings-modal';
+import { GeneratedOutfitModal } from '@/components/ui/generated-outfit-modal';
+import { OutfitGeneratorService } from '@/services/outfitGeneratorService';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useWardrobeContext } from '@/contexts/WardrobeContext';
+import { useOutfitContext } from '@/contexts/OutfitContext';
 import { getTodayForecast } from '@/services/weatherService';
-import { WeatherData } from '@/types/weather';
+import { WeatherData, LocationSearchResult, ForecastData } from '@/types/weather';
 import { ClothingItem, ClimateType } from '@/types/detections';
 import { cn } from '@/lib/utils';
 
@@ -33,20 +37,83 @@ export const SuggestionsScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isRealWeather, setIsRealWeather] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedLocation, setSelectedLocation] = useState<LocationSearchResult | null>(null);
+  const [useCurrentLocation, setUseCurrentLocation] = useState(true);
+  const [showOutfitModal, setShowOutfitModal] = useState(false);
+  const [generatedOutfit, setGeneratedOutfit] = useState<any>(null);
+  const [generatingOutfit, setGeneratingOutfit] = useState(false);
 
   const { getCurrentPosition, loading: geoLoading, error: geoError } = useGeolocation();
   const { items, getItemsByClimate } = useWardrobeContext();
+  const { createOutfit } = useOutfitContext();
 
-  const fetchWeatherAndSuggestions = async () => {
+  const fetchWeatherAndSuggestions = async (customLocation?: LocationSearchResult, customDate?: Date) => {
     try {
       setLoading(true);
       setError(null);
 
-      // Obtener ubicación
-      const coordinates = await getCurrentPosition();
+      let coordinates;
+      let weatherData: WeatherData;
 
-      // Obtener clima y detectar si es real o simulado
-      const weatherData = await getTodayForecast(coordinates.latitude, coordinates.longitude);
+      // Determinar coordenadas a usar
+      if (customLocation) {
+        coordinates = {
+          latitude: customLocation.latitude,
+          longitude: customLocation.longitude
+        };
+      } else if (selectedLocation && !useCurrentLocation) {
+        coordinates = {
+          latitude: selectedLocation.latitude,
+          longitude: selectedLocation.longitude
+        };
+      } else {
+        coordinates = await getCurrentPosition();
+      }
+
+      // Determinar fecha a usar
+      const targetDate = customDate || selectedDate;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const targetDateOnly = new Date(targetDate);
+      targetDateOnly.setHours(0, 0, 0, 0);
+
+      // Obtener datos del clima según la fecha
+      if (targetDateOnly.getTime() === today.getTime()) {
+        // Fecha actual - usar API de clima actual
+        weatherData = await getTodayForecast(coordinates.latitude, coordinates.longitude);
+      } else if (targetDate > today) {
+        // Fecha futura - usar API de pronóstico
+        const weatherService = await import('@/services/weatherService');
+        const service = weatherService.WeatherService.getInstance();
+        const forecasts = await service.getForecast(coordinates.latitude, coordinates.longitude, 7);
+
+        // Buscar el pronóstico para la fecha específica
+        const targetForecast = forecasts.find(forecast => {
+          const forecastDate = new Date(forecast.date);
+          forecastDate.setHours(0, 0, 0, 0);
+          return forecastDate.getTime() === targetDateOnly.getTime();
+        });
+
+        if (targetForecast) {
+          weatherData = {
+            temperature: targetForecast.temperature,
+            condition: targetForecast.condition,
+            humidity: targetForecast.humidity,
+            windSpeed: targetForecast.windSpeed,
+            location: targetForecast.location,
+            climate: targetForecast.climate
+          };
+        } else {
+          // Fallback a datos actuales si no hay pronóstico
+          weatherData = await getTodayForecast(coordinates.latitude, coordinates.longitude);
+        }
+      } else {
+        // Fecha pasada - usar datos actuales como fallback
+        weatherData = await getTodayForecast(coordinates.latitude, coordinates.longitude);
+      }
+
       setWeather(weatherData);
 
       // Detectar si los datos son reales (basado en si hay API key)
@@ -101,6 +168,76 @@ export const SuggestionsScreen: React.FC = () => {
     return recommended.slice(0, 6); // Máximo 6 sugerencias
   };
 
+  const handleLocationSelect = (location: LocationSearchResult) => {
+    setSelectedLocation(location);
+    setUseCurrentLocation(false);
+    fetchWeatherAndSuggestions(location);
+  };
+
+  const handleDateSelect = (date: Date) => {
+    setSelectedDate(date);
+    fetchWeatherAndSuggestions(undefined, date);
+  };
+
+  const handleUseCurrentLocation = () => {
+    setSelectedLocation(null);
+    setUseCurrentLocation(true);
+    fetchWeatherAndSuggestions();
+  };
+
+  const generateOutfit = async () => {
+    if (!weather) return;
+
+    setGeneratingOutfit(true);
+    setGeneratedOutfit(null); // Limpiar outfit anterior
+
+    try {
+      const includeCoat = OutfitGeneratorService.shouldIncludeCoat(weather.climate as ClimateType);
+
+      const outfit = OutfitGeneratorService.generateOutfit({
+        climate: weather.climate as ClimateType,
+        availableItems: items,
+        includeCoat
+      });
+
+      setGeneratedOutfit(outfit);
+      setShowOutfitModal(true);
+    } catch (error) {
+      console.error('Error generating outfit:', error);
+      setGeneratedOutfit(null);
+      setShowOutfitModal(true);
+    } finally {
+      setGeneratingOutfit(false);
+    }
+  };
+
+  const saveGeneratedOutfit = async (outfitName: string) => {
+    if (!generatedOutfit) return;
+
+    try {
+      // Determinar fechas de uso
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const targetDate = new Date(selectedDate);
+      targetDate.setHours(0, 0, 0, 0);
+
+      // Si la fecha seleccionada no es hoy, agregar como fecha de uso planificada
+      const fechasUso: Date[] = [];
+      if (targetDate.getTime() !== today.getTime()) {
+        fechasUso.push(targetDate);
+      }
+
+      // Crear el outfit con las fechas de uso
+      await createOutfit(outfitName, generatedOutfit.items, fechasUso);
+
+      console.log('✅ Outfit guardado exitosamente');
+      setShowOutfitModal(false);
+    } catch (error) {
+      console.error('Error saving outfit:', error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     if (items.length > 0) {
       fetchWeatherAndSuggestions();
@@ -117,7 +254,7 @@ export const SuggestionsScreen: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <h1 className="text-2xl font-bold">Sugerencias del Día</h1>
+                <h1 className="text-2xl font-bold">Sugerencias</h1>
                 <WeatherStatus
                   isReal={isRealWeather}
                   isLoading={loading || geoLoading}
@@ -129,15 +266,35 @@ export const SuggestionsScreen: React.FC = () => {
               </p>
             </div>
 
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={fetchWeatherAndSuggestions}
-              disabled={loading || geoLoading}
-            >
-              <RefreshCw className={cn("w-4 h-4", (loading || geoLoading) && "animate-spin")} />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowSettingsModal(true)}
+                className="text-sm hidden sm:flex"
+              >
+                <Edit3 className="w-4 h-4 mr-2" />
+                Editar fecha o ubicación
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowSettingsModal(true)}
+                className="sm:hidden"
+              >
+                <Edit3 className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => fetchWeatherAndSuggestions()}
+                disabled={loading || geoLoading}
+              >
+                <RefreshCw className={cn("w-4 h-4", (loading || geoLoading) && "animate-spin")} />
+              </Button>
+            </div>
           </div>
+
+
 
           {/* Weather Card */}
           {weather && (
@@ -188,13 +345,40 @@ export const SuggestionsScreen: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Botón de generar outfit */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="mt-4"
+              >
+                <Button
+                  onClick={generateOutfit}
+                  disabled={generatingOutfit || !weather || items.length === 0}
+                  className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white"
+                  size="lg"
+                >
+                  {generatingOutfit ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      Generando outfit...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Generar outfit sugerido
+                    </>
+                  )}
+                </Button>
+              </motion.div>
             </motion.div>
           )}
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto content-with-bottom-nav">
         {error && (
           <div className="p-4">
             <div className="p-4 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md">
@@ -343,6 +527,29 @@ export const SuggestionsScreen: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Modal de configuración */}
+      <WeatherSettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        selectedDate={selectedDate}
+        onDateSelect={handleDateSelect}
+        selectedLocation={selectedLocation}
+        onLocationSelect={handleLocationSelect}
+        useCurrentLocation={useCurrentLocation}
+        onUseCurrentLocation={handleUseCurrentLocation}
+        currentLocationName={weather?.location}
+      />
+
+      {/* Modal de outfit generado */}
+      <GeneratedOutfitModal
+        isOpen={showOutfitModal}
+        onClose={() => setShowOutfitModal(false)}
+        outfit={generatedOutfit}
+        onRegenerate={generateOutfit}
+        onSaveOutfit={saveGeneratedOutfit}
+        loading={generatingOutfit}
+      />
     </div>
   );
 };

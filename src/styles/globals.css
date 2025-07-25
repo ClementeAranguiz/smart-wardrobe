@@ -202,3 +202,37 @@
     padding-bottom: max(env(safe-area-inset-bottom), 16px);
   }
 }
+
+/* Utilidades para contenido con bottom navigation */
+.content-with-bottom-nav {
+  padding-bottom: calc(72px + max(env(safe-area-inset-bottom), 12px) + 16px);
+}
+
+@media (max-width: 375px) {
+  .content-with-bottom-nav {
+    padding-bottom: calc(68px + max(env(safe-area-inset-bottom), 8px) + 16px);
+  }
+}
+
+@media (min-width: 768px) {
+  .content-with-bottom-nav {
+    padding-bottom: calc(76px + max(env(safe-area-inset-bottom), 16px) + 16px);
+  }
+}
+
+/* Para contenedores de scroll que necesitan espacio para el bottom nav */
+.scroll-container-with-bottom-nav {
+  height: calc(100% - 72px - max(env(safe-area-inset-bottom), 12px));
+}
+
+@media (max-width: 375px) {
+  .scroll-container-with-bottom-nav {
+    height: calc(100% - 68px - max(env(safe-area-inset-bottom), 8px));
+  }
+}
+
+@media (min-width: 768px) {
+  .scroll-container-with-bottom-nav {
+    height: calc(100% - 76px - max(env(safe-area-inset-bottom), 16px));
+  }
+}

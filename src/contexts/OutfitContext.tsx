@@ -8,7 +8,7 @@ interface OutfitContextType {
   outfits: Outfit[];
   loading: boolean;
   error: string | null;
-  createOutfit: (nombre: string, prendas: ClothingItem[]) => Promise<void>;
+  createOutfit: (nombre: string, prendas: ClothingItem[], fechasUso?: Date[]) => Promise<void>;
   updateOutfitData: (outfitId: string, updates: Partial<Outfit>) => Promise<void>;
   removeOutfit: (outfitId: string) => Promise<void>;
   refreshOutfits: () => Promise<void>;
@@ -68,7 +68,7 @@ export const OutfitProvider: React.FC<OutfitProviderProps> = ({ children }) => {
     }
   };
 
-  const createOutfit = async (nombre: string, prendas: ClothingItem[]): Promise<void> => {
+  const createOutfit = async (nombre: string, prendas: ClothingItem[], fechasUso: Date[] = []): Promise<void> => {
     if (!user) throw new Error('Usuario no autenticado');
     if (prendas.length === 0) throw new Error('Debe seleccionar al menos una prenda');
 
@@ -80,7 +80,7 @@ export const OutfitProvider: React.FC<OutfitProviderProps> = ({ children }) => {
         prendas,
         userId: user.uid,
         fechaCreacion: new Date(),
-        fechasUso: []
+        fechasUso
       };
 
       const outfitId = await saveOutfit(outfitToSave);

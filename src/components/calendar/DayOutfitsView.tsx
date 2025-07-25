@@ -73,7 +73,7 @@ export const DayOutfitsView: React.FC<DayOutfitsViewProps> = ({
       </div>
 
       {/* Content */}
-      <div className="flex-1 px-6 pb-6 overflow-auto">
+      <div className="flex-1 px-6 overflow-auto content-with-bottom-nav">
         {outfits.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
