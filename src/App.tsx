@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuthContext } from '@/contexts/AuthContext';
 import { WardrobeProvider } from '@/contexts/WardrobeContext';
+import { OutfitProvider } from '@/contexts/OutfitContext';
 import { ToastProvider } from '@/contexts/ToastContext';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { LoginScreen } from '@/screens/LoginScreen';
@@ -71,7 +72,9 @@ const AppRoutes: React.FC = () => {
         <ProtectedRoute>
           <ToastProvider>
             <WardrobeProvider>
-              <AppLayout />
+              <OutfitProvider>
+                <AppLayout />
+              </OutfitProvider>
             </WardrobeProvider>
           </ToastProvider>
         </ProtectedRoute>

@@ -1,5 +1,5 @@
 export interface ColorInfo {
-  nombre: string;
+  nombre?: string; // Opcional - para compatibilidad con API antigua
   rgb: [number, number, number];
   hex: string;
   frecuencia: number;
@@ -31,7 +31,23 @@ export interface ClothingItem {
 }
 
 export type ClothingCategory = 'superior' | 'inferior' | 'calzado' | 'accesorio' | 'abrigo';
-export type ClimateType = 'calor' | 'frio' | 'lluvia' | 'entretiempo' | 'nieve' | 'viento';
+export type ClimateType = 'calor' | 'frio' | 'frio extremo' | 'lluvia' | 'entretiempo' | 'nieve' | 'viento' | 'interior' | 'soleado';
+
+// Outfit types
+export interface Outfit {
+  id: string;
+  nombre: string;
+  prendas: ClothingItem[];
+  fechaCreacion: Date;
+  userId: string;
+  fechasUso?: Date[]; // Fechas cuando se usó o se planea usar el outfit
+}
+
+export interface OutfitUsage {
+  outfitId: string;
+  fecha: Date;
+  tipo: 'usado' | 'planificado';
+}
 
 // Datos simulados para el modelo
 export const deteccionesSimuladas: Detecciones = {

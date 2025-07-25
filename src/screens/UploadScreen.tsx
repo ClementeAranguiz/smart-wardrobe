@@ -358,19 +358,14 @@ export const UploadScreen: React.FC<UploadScreenProps> = ({ isOpen, onClose }) =
         nombre: newSelection.nombre,
         categoria: newSelection.categoria,
         climas: newSelection.climas,
-        confianza: Math.round(newSelection.confianza * 100)
+        confianza: Math.round(newSelection.confianza * 100),
+        colores: newSelection.colores
       }
     });
   };
 
   const renderResultsStep = () => (
     <div className="space-y-6">
-      <div className="text-center">
-        <h3 className="text-lg font-semibold mb-2">Prenda Detectada</h3>
-        <p className="text-muted-foreground">
-          Revisa la detección y confirma si es correcta
-        </p>
-      </div>
 
       {detections && Object.entries(detections).map(([key, detection]) => {
         const apiResponse = detection._apiResponse;
@@ -385,14 +380,16 @@ export const UploadScreen: React.FC<UploadScreenProps> = ({ isOpen, onClose }) =
               confianza: mainDetection.confianza || (detection.confianza || 0) / 100,
               nombre: mainDetection.nombre || detection.nombre,
               categoria: mainDetection.categoria || detection.categoria,
-              climas: mainDetection.climas || detection.climas
+              climas: mainDetection.climas || detection.climas,
+              colores: mainDetection.colores || detection.colores
             }}
             alternatives={alternatives.map((alt: any) => ({
               clase: alt.clase,
               confianza: alt.confianza,
               nombre: alt.nombre,
               categoria: alt.categoria,
-              climas: alt.climas
+              climas: alt.climas,
+              colores: alt.colores
             }))}
             onSelectionChange={(selected) => handleDetectionChange(key, selected)}
           />
@@ -435,14 +432,14 @@ export const UploadScreen: React.FC<UploadScreenProps> = ({ isOpen, onClose }) =
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            Subir Prenda
-            <Button variant="ghost" size="icon" onClick={handleClose}>
-              <X className="w-4 h-4" />
-            </Button>
+          <DialogTitle>
+            {currentStep === 'results' ? 'Prenda Detectada' : 'Subir Prenda'}
           </DialogTitle>
           <DialogDescription>
-            Agrega nuevas prendas a tu armario tomando una foto o seleccionando una imagen
+            {currentStep === 'results'
+              ? 'Revisa la detección y confirma si es correcta'
+              : 'Agrega nuevas prendas a tu armario tomando una foto o seleccionando una imagen'
+            }
           </DialogDescription>
         </DialogHeader>
 

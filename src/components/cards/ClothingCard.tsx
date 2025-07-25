@@ -33,19 +33,25 @@ interface ClothingCardProps {
 const climateIcons: Record<ClimateType, React.ComponentType<{ className?: string }>> = {
   calor: Sun,
   frio: Snowflake,
+  'frio extremo': Snowflake,
   lluvia: CloudRain,
   entretiempo: Cloud,
   viento: Cloud,
-  nieve: Snowflake
+  nieve: Snowflake,
+  interior: Thermometer,
+  soleado: Sun
 };
 
 const climateColors: Record<ClimateType, string> = {
   calor: 'text-orange-500',
   frio: 'text-blue-500',
+  'frio extremo': 'text-blue-700',
   lluvia: 'text-blue-600',
   entretiempo: 'text-gray-500',
   viento: 'text-green-500',
-  nieve: 'text-blue-300'
+  nieve: 'text-blue-300',
+  interior: 'text-purple-500',
+  soleado: 'text-yellow-500'
 };
 
 const categoryLabels: Record<string, string> = {
@@ -200,8 +206,8 @@ export const ClothingCard: React.FC<ClothingCardProps> = ({
           {/* Climas */}
           <div className="flex items-center gap-1 flex-wrap mb-2">
             {item.climas.map((clima) => {
-              const Icon = climateIcons[clima as ClimateType];
-              const colorClass = climateColors[clima as ClimateType];
+              const Icon = climateIcons[clima as ClimateType] || Cloud;
+              const colorClass = climateColors[clima as ClimateType] || 'text-gray-500';
 
               return (
                 <motion.div

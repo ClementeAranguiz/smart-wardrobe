@@ -30,6 +30,9 @@ export const DetectionAlternatives: React.FC<DetectionAlternativesProps> = ({
   const [showAlternatives, setShowAlternatives] = useState(false);
   const [selectedOption, setSelectedOption] = useState(mainDetection);
 
+  // Crear lista completa de todas las opciones (principal + alternativas)
+  const allOptions = [mainDetection, ...alternatives];
+
   const handleOptionSelect = (option: DetectionOption) => {
     setSelectedOption(option);
     onSelectionChange(option);
@@ -58,36 +61,52 @@ export const DetectionAlternatives: React.FC<DetectionAlternativesProps> = ({
             <span className="font-medium">Categoría:</span> {selectedOption.categoria}
           </div>
           
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1 mb-2">
             {selectedOption.climas.map((clima) => (
               <Badge key={clima} variant="outline" className="text-xs">
                 {clima}
               </Badge>
             ))}
           </div>
+
+          {selectedOption.colores && selectedOption.colores.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Colores:</span>
+              <ColorDots
+                colors={selectedOption.colores}
+                size="sm"
+                maxColors={4}
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Botón para mostrar alternativas */}
+      {/* Botón para mostrar todas las opciones */}
       {alternatives.length > 0 && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setShowAlternatives(!showAlternatives)}
-          className="w-full flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground"
-        >
-          {showAlternatives ? (
-            <>
-              <ChevronUp className="w-4 h-4" />
-              Ocultar otras opciones
-            </>
-          ) : (
-            <>
-              <ChevronDown className="w-4 h-4" />
-              Ver otras opciones ({alternatives.length})
-            </>
-          )}
-        </Button>
+        <div className="text-center">
+          <p className="text-sm text-muted-foreground mb-2">
+            ¿No es correcto? Selecciona la opción correcta:
+          </p>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowAlternatives(!showAlternatives)}
+            className="w-full flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground"
+          >
+            {showAlternatives ? (
+              <>
+                <ChevronUp className="w-4 h-4" />
+                Ocultar opciones
+              </>
+            ) : (
+              <>
+                <ChevronDown className="w-4 h-4" />
+                Ver todas las opciones ({allOptions.length})
+              </>
+            )}
+          </Button>
+        </div>
       )}
 
       {/* Alternativas */}
@@ -104,7 +123,7 @@ export const DetectionAlternatives: React.FC<DetectionAlternativesProps> = ({
               ¿No es correcto? Selecciona la opción correcta:
             </div>
             
-            {alternatives.map((option, index) => (
+            {allOptions.map((option, index) => (
               <motion.div
                 key={option.clase}
                 initial={{ opacity: 0, x: -20 }}

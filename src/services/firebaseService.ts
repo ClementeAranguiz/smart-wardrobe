@@ -31,7 +31,7 @@ import {
   deleteObject,
   connectStorageEmulator
 } from "firebase/storage";
-import { ClothingItem } from "@/types/detections";
+import { ClothingItem, Outfit } from "@/types/detections";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAAp1I3STC2pCuoCGj_5usRyp4gMq-s1Ek",
@@ -134,25 +134,40 @@ export const updateClothingItem = async (itemId: string, updates: Partial<Clothi
     console.log('🔄 Starting update for item:', itemId);
     console.log('🔄 Original updates:', updates);
 
+    // Verificar autenticación
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error('Usuario no autenticado');
+    }
+    console.log('👤 Current user ID:', currentUser.uid);
+
     const itemRef = doc(db, 'wardrobe', itemId);
+    console.log('📍 Document reference path:', itemRef.path);
 
     // Primero, vamos a leer el documento actual para verificar
+    console.log('🔍 Attempting to read document...');
     const currentDoc = await getDoc(itemRef);
+    console.log('✅ Document read successful');
+
     if (!currentDoc.exists()) {
       console.error('❌ Document does not exist in Firestore:', itemId);
       throw new Error(`La prenda ya no existe en la base de datos. Puede haber sido eliminada. Actualiza la página para sincronizar.`);
     }
 
-    console.log('📄 Current document data:', currentDoc.data());
+    const currentData = currentDoc.data();
+    console.log('📄 Current document data:', currentData);
+    console.log('🔍 Document userId:', currentData?.userId);
+    console.log('🔍 Current user ID:', currentUser.uid);
+    console.log('🔍 UserIds match:', currentData?.userId === currentUser.uid);
 
-    // Crear el objeto de actualización sin modificar userId
+    // Crear el objeto de actualización manteniendo el userId original
     const updateData: any = {
       ...updates,
+      userId: currentData.userId, // Mantener el userId original
       fechaModificacion: new Date()
     };
 
-    // Asegurar que no se modifique el userId
-    delete updateData.userId;
+    // Asegurar que no se modifiquen campos críticos
     delete updateData.id;
     delete updateData.fechaCreacion;
 
@@ -218,9 +233,116 @@ export const deleteClothingImage = async (userId: string, itemId: string): Promi
     const imageRef = ref(storage, `wardrobe-images/${userId}/${itemId}/original.jpg`);
     await deleteObject(imageRef);
     console.log('✅ Image deleted successfully from Storage');
-  } catch (error) {
-    console.error('❌ Error deleting image:', error);
+  } catch (error: any) {
+    // Si la imagen no existe, no es un error real
+    if (error?.code === 'storage/object-not-found') {
+      console.log('ℹ️ Image not found in Storage (may not have been uploaded), skipping deletion');
+    } else {
+      console.error('❌ Error deleting image:', error);
+    }
     // No lanzamos error aquí porque la prenda ya se eliminó de Firestore
-    // Solo logueamos el error para debugging
+  }
+};
+
+// Outfit functions
+export const saveOutfit = async (outfit: Omit<Outfit, 'id'>): Promise<string> => {
+  try {
+    const docRef = await addDoc(collection(db, 'outfits'), {
+      ...outfit,
+      fechaCreacion: new Date(),
+      // Convertir las prendas a referencias simples para evitar duplicación de datos
+      prendas: outfit.prendas.map(prenda => ({
+        id: prenda.id,
+        nombre: prenda.nombre,
+        categoria: prenda.categoria,
+        imagen: prenda.imagen
+      }))
+    });
+    console.log('✅ Outfit saved successfully:', docRef.id);
+    return docRef.id;
+  } catch (error) {
+    console.error('❌ Error saving outfit:', error);
+    throw new Error('Error al guardar el outfit. Verifica tu conexión e inténtalo de nuevo.');
+  }
+};
+
+export const getUserOutfits = async (userId: string): Promise<Outfit[]> => {
+  try {
+    // Primero intentamos con la consulta optimizada (requiere índice)
+    try {
+      const q = query(
+        collection(db, 'outfits'),
+        where('userId', '==', userId),
+        orderBy('fechaCreacion', 'desc')
+      );
+
+      const querySnapshot = await getDocs(q);
+      const outfits = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        fechaCreacion: doc.data().fechaCreacion?.toDate() || new Date(),
+        fechasUso: doc.data().fechasUso?.map((fecha: any) => fecha.toDate()) || []
+      } as Outfit));
+
+      console.log(`✅ Retrieved ${outfits.length} outfits for user ${userId} (with index)`);
+      return outfits;
+    } catch (indexError) {
+      console.warn('⚠️ Index not available for outfits, using simple query:', indexError);
+
+      // Fallback: consulta simple sin orderBy
+      const q = query(
+        collection(db, 'outfits'),
+        where('userId', '==', userId)
+      );
+
+      const querySnapshot = await getDocs(q);
+      const outfits = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        fechaCreacion: doc.data().fechaCreacion?.toDate() || new Date(),
+        fechasUso: doc.data().fechasUso?.map((fecha: any) => fecha.toDate()) || []
+      } as Outfit));
+
+      // Ordenar en el cliente
+      outfits.sort((a, b) => b.fechaCreacion.getTime() - a.fechaCreacion.getTime());
+
+      console.log(`✅ Retrieved ${outfits.length} outfits for user ${userId} (client-side sorted)`);
+      return outfits;
+    }
+  } catch (error) {
+    console.error('❌ Error getting outfits:', error);
+    throw new Error('Error al cargar los outfits. Verifica tu conexión e inténtalo de nuevo.');
+  }
+};
+
+export const updateOutfit = async (outfitId: string, updates: Partial<Outfit>): Promise<void> => {
+  try {
+    const outfitRef = doc(db, 'outfits', outfitId);
+    await updateDoc(outfitRef, {
+      ...updates,
+      // Si se actualizan las prendas, convertir a referencias simples
+      ...(updates.prendas && {
+        prendas: updates.prendas.map(prenda => ({
+          id: prenda.id,
+          nombre: prenda.nombre,
+          categoria: prenda.categoria,
+          imagen: prenda.imagen
+        }))
+      })
+    });
+    console.log('✅ Outfit updated successfully:', outfitId);
+  } catch (error) {
+    console.error('❌ Error updating outfit:', error);
+    throw new Error('Error al actualizar el outfit. Verifica tu conexión e inténtalo de nuevo.');
+  }
+};
+
+export const deleteOutfit = async (outfitId: string): Promise<void> => {
+  try {
+    await deleteDoc(doc(db, 'outfits', outfitId));
+    console.log('✅ Outfit deleted successfully:', outfitId);
+  } catch (error) {
+    console.error('❌ Error deleting outfit:', error);
+    throw new Error('Error al eliminar el outfit. Verifica tu conexión e inténtalo de nuevo.');
   }
 };

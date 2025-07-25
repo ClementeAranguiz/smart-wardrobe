@@ -49,11 +49,11 @@ export const ColorDisplay: React.FC<ColorDisplayProps> = ({
               sizeClasses[size]
             )}
             style={{ backgroundColor: color.hex }}
-            title={`${color.nombre}${showPercentages ? ` (${(color.frecuencia * 100).toFixed(0)}%)` : ''}`}
+            title={`${color.hex}${showPercentages ? ` (${(color.frecuencia * 100).toFixed(0)}%)` : ''}`}
           />
           
           {/* Nombre del color */}
-          {showNames && (
+          {showNames && color.nombre && (
             <span className={cn(
               "capitalize font-medium",
               size === 'sm' ? 'text-xs' : size === 'md' ? 'text-sm' : 'text-base'
@@ -64,6 +64,16 @@ export const ColorDisplay: React.FC<ColorDisplayProps> = ({
                   ({(color.frecuencia * 100).toFixed(0)}%)
                 </span>
               )}
+            </span>
+          )}
+
+          {/* Mostrar porcentaje sin nombre si no hay nombre */}
+          {showPercentages && !color.nombre && (
+            <span className={cn(
+              "text-muted-foreground font-medium",
+              size === 'sm' ? 'text-xs' : size === 'md' ? 'text-sm' : 'text-base'
+            )}>
+              {(color.frecuencia * 100).toFixed(0)}%
             </span>
           )}
         </div>
@@ -112,7 +122,7 @@ export const ColorTags: React.FC<ColorDisplayProps> = ({
             borderColor: color.hex
           }}
         >
-          {color.nombre}
+          {color.nombre || color.hex}
           {showPercentages && (
             <span className="ml-1 opacity-75">
               {(color.frecuencia * 100).toFixed(0)}%
@@ -159,7 +169,7 @@ export const ColorDots: React.FC<ColorDisplayProps> = ({
             sizeClasses[size]
           )}
           style={{ backgroundColor: color.hex }}
-          title={color.nombre}
+          title={color.nombre || `${color.hex} (${(color.frecuencia * 100).toFixed(0)}%)`}
         />
       ))}
       

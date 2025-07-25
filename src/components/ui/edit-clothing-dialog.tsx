@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Edit2, Save, X, Trash2 } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -99,6 +99,9 @@ export const EditClothingDialog: React.FC<EditClothingDialogProps> = ({
             <Edit2 className="w-5 h-5" />
             Editar Prenda
           </DialogTitle>
+          <DialogDescription>
+            Modifica los detalles de tu prenda
+          </DialogDescription>
         </DialogHeader>
 
         {!showDeleteConfirm ? (

@@ -71,16 +71,23 @@ export const WardrobeProvider: React.FC<WardrobeProviderProps> = ({ children }) 
     try {
       console.log('🔄 Sincronizando con Firestore...');
 
+      // Limpiar localStorage primero para evitar conflictos
+      localStorage.removeItem(`wardrobe_${user.uid}`);
+
       // Obtener datos frescos de Firestore
       const firestoreItems = await getUserClothingItems(user.uid);
+
+      console.log('📊 Items from Firestore:', firestoreItems.map(item => ({ id: item.id, nombre: item.nombre })));
+      console.log('📊 Current local items:', items.map(item => ({ id: item.id, nombre: item.nombre })));
 
       // Actualizar estado local
       setItems(firestoreItems);
 
-      // Actualizar localStorage
+      // Actualizar localStorage con datos limpios
       localStorage.setItem(`wardrobe_${user.uid}`, JSON.stringify(firestoreItems));
 
       console.log('✅ Sincronización completada');
+      console.log('📊 Updated local items:', firestoreItems.map(item => ({ id: item.id, nombre: item.nombre })));
 
     } catch (err) {
       console.error('❌ Error en sincronización:', err);
@@ -93,32 +100,31 @@ export const WardrobeProvider: React.FC<WardrobeProviderProps> = ({ children }) 
 
     try {
       setError(null);
-      const newItem: ClothingItem = {
+
+      // Crear item SIN ID temporal - Firebase generará el ID
+      const itemToSave = {
         ...item,
-        id: Date.now().toString(), // ID temporal
         userId: user.uid,
         fechaCreacion: new Date()
       };
 
-      // Agregar primero al estado local
+      // Guardar DIRECTAMENTE en Firebase primero
+      const firebaseId = await saveClothingItem(itemToSave);
+
+      // Crear el item completo con el ID real de Firebase
+      const newItem: ClothingItem = {
+        ...itemToSave,
+        id: firebaseId
+      };
+
+      // Agregar al estado local con ID real
       setItems(prev => [newItem, ...prev]);
 
-      // Guardar en localStorage como backup
+      // Guardar en localStorage con ID real
       const updatedItems = [newItem, ...items];
       localStorage.setItem(`wardrobe_${user.uid}`, JSON.stringify(updatedItems));
 
-      try {
-        // Intentar guardar en Firebase
-        const itemId = await saveClothingItem(newItem);
-
-        // Actualizar con el ID real de Firebase
-        setItems(prev => prev.map(i =>
-          i.id === newItem.id ? { ...i, id: itemId } : i
-        ));
-      } catch (firebaseError) {
-        console.warn('Error saving to Firebase, keeping local copy:', firebaseError);
-        setError('Prenda guardada localmente. Se sincronizará cuando se restablezca la conexión.');
-      }
+      console.log('✅ Item saved with Firebase ID:', firebaseId);
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar la prenda');
@@ -135,7 +141,13 @@ export const WardrobeProvider: React.FC<WardrobeProviderProps> = ({ children }) 
       console.log('🔄 WardrobeContext: Updating item', itemId, 'with updates:', updates);
       console.log('🔄 Current user:', user.uid);
 
-      // Actualizar en Firebase
+      // Verificar si el item existe localmente
+      const localItem = items.find(item => item.id === itemId);
+      if (!localItem) {
+        throw new Error('Item no encontrado localmente');
+      }
+
+      // Actualizar en Firebase primero
       await updateClothingItem(itemId, updates);
 
       // Actualizar en el estado local
@@ -148,6 +160,8 @@ export const WardrobeProvider: React.FC<WardrobeProviderProps> = ({ children }) 
         item.id === itemId ? { ...item, ...updates } : item
       );
       localStorage.setItem(`wardrobe_${user.uid}`, JSON.stringify(updatedItems));
+
+      console.log('✅ Item updated successfully:', itemId);
 
     } catch (err) {
       // Si el error es que el documento no existe, remover del estado local

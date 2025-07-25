@@ -73,7 +73,7 @@ climates_matrix = None
 category_map = None
 nombre_map = None
 
-RUTA_MODEL = 'C:/Users/diego/OneDrive/Documentos/USM/Vision Computer/Proyecto/SmartWardrove/AppSmartWardrove/smart-wardrobe/vit_clothes_prediction.pth'
+RUTA_MODEL = '../vit_clothes_prediction.pth'
 def load_model():
     global model, processor, climate_data, class_names, classes, climate2idx, climates_matrix, category_map, nombre_map
 

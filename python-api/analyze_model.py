@@ -7,7 +7,7 @@ def analyze_checkpoint():
     print("=" * 50)
     
     # Cargar checkpoint
-    checkpoint = torch.load('C:/Users/diego/OneDrive/Documentos/USM/Vision Computer/Proyecto/SmartWardrove/AppSmartWardrove/smart-wardrobe/vit_clothes_prediction.pth', map_location='cpu')
+    checkpoint = torch.load('../vit_clothes_prediction.pth', map_location='cpu')
     
     print(f"📦 Tipo de checkpoint: {type(checkpoint)}")
     print(f"🔑 Claves principales: {list(checkpoint.keys())}")
@@ -79,11 +79,11 @@ def compare_with_climate_json():
     print("=" * 50)
     
     # Cargar checkpoint
-    checkpoint = torch.load('C:/Users/diego/OneDrive/Documentos/USM/Vision Computer/Proyecto/SmartWardrove/AppSmartWardrove/smart-wardrobe/vit_clothes_prediction.pth', map_location='cpu')
+    checkpoint = torch.load('../vit_clothes_prediction.pth', map_location='cpu')
     model_classes = checkpoint.get('classes', [])
     
     # Cargar climate.json
-    with open('C:/Users/diego/OneDrive/Documentos/USM/Vision Computer/Proyecto/SmartWardrove/AppSmartWardrove/smart-wardrobe/climate.json', 'r', encoding='utf-8') as f:
+    with open('../climate.json', 'r', encoding='utf-8') as f:
         climate_data = json.load(f)
     
     climate_classes = list(climate_data.keys())
@@ -134,7 +134,7 @@ def suggest_fixes():
     print("💡 Posibles Soluciones")
     print("=" * 50)
     
-    checkpoint = torch.load('C:/Users/diego/OneDrive/Documentos/USM/Vision Computer/Proyecto/SmartWardrove/AppSmartWardrove/smart-wardrobe/vit_clothes_prediction.pth', map_location='cpu')
+    checkpoint = torch.load('../vit_clothes_prediction.pth', map_location='cpu')
     
     print("🔧 Opciones para arreglar el modelo:")
     print()

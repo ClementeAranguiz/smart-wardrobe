@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, Calendar, Tag } from 'lucide-react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ClothingItem, ClimateType } from '@/types/detections';
@@ -52,6 +52,13 @@ export const ClothingViewDialog: React.FC<ClothingViewDialogProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto p-0">
+        <DialogHeader className="sr-only">
+          <DialogTitle>{item.nombre}</DialogTitle>
+          <DialogDescription>
+            Detalles de la prenda {item.nombre}
+          </DialogDescription>
+        </DialogHeader>
+
         {/* Header con botón de cerrar */}
         <div className="sticky top-0 bg-background/95 backdrop-blur-sm border-b p-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold capitalize">{item.nombre}</h2>

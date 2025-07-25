@@ -1,10 +1,46 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Clock, Shirt, Plus } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Shirt, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { OutfitListScreen } from './OutfitListScreen';
+import { RegisterUsageScreen } from './RegisterUsageScreen';
+import { CalendarView } from '@/components/calendar/CalendarView';
+import { DayOutfitsView } from '@/components/calendar/DayOutfitsView';
+import { Outfit } from '@/types/detections';
+
+type CalendarViewType = 'main' | 'outfits' | 'register' | 'day';
 
 export const CalendarScreen: React.FC = () => {
+  const [currentView, setCurrentView] = useState<CalendarViewType>('main');
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDayOutfits, setSelectedDayOutfits] = useState<Outfit[]>([]);
+
+  const handleDayClick = (date: Date, outfits: Outfit[]) => {
+    setSelectedDate(date);
+    setSelectedDayOutfits(outfits);
+    setCurrentView('day');
+  };
+
+  // Renderizar la vista actual
+  if (currentView === 'outfits') {
+    return <OutfitListScreen onBack={() => setCurrentView('main')} />;
+  }
+
+  if (currentView === 'register') {
+    return <RegisterUsageScreen onBack={() => setCurrentView('main')} />;
+  }
+
+  if (currentView === 'day' && selectedDate) {
+    return (
+      <DayOutfitsView
+        date={selectedDate}
+        outfits={selectedDayOutfits}
+        onBack={() => setCurrentView('main')}
+      />
+    );
+  }
+
+  // Vista principal del calendario
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Header */}
@@ -14,60 +50,45 @@ export const CalendarScreen: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <h1 className="text-2xl font-bold mb-2">Calendario</h1>
-          <p className="text-muted-foreground">
-            Planifica tus outfits y organiza tu armario
-          </p>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-2xl font-bold mb-1">Calendario</h1>
+              <p className="text-muted-foreground">
+                Organiza tus outfits y planifica tu armario
+              </p>
+            </div>
+          </div>
+
+          {/* Botones principales */}
+          <div className="flex gap-3">
+            <Button
+              onClick={() => setCurrentView('outfits')}
+              className="flex-1"
+            >
+              <Shirt className="w-4 h-4 mr-2" />
+              Mis Outfits
+            </Button>
+
+            <Button
+              onClick={() => setCurrentView('register')}
+              variant="outline"
+              className="flex-1"
+            >
+              <Clock className="w-4 h-4 mr-2" />
+              Registrar Uso
+            </Button>
+          </div>
         </motion.div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 px-6 pb-6">
+      {/* Calendar Content */}
+      <div className="flex-1 px-6 pb-6 overflow-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
-          className="h-full"
         >
-          <Card className="h-full flex flex-col items-center justify-center">
-            <CardContent className="text-center p-8">
-              <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Calendar className="w-10 h-10 text-primary" />
-              </div>
-              
-              <h2 className="text-xl font-semibold mb-3">
-                Próximamente
-              </h2>
-              
-              <p className="text-muted-foreground mb-6 max-w-sm">
-                Aquí podrás planificar tus outfits, programar combinaciones y 
-                organizar tu armario por fechas y eventos especiales.
-              </p>
-
-              <div className="space-y-3 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2 justify-center">
-                  <Clock className="w-4 h-4" />
-                  <span>Planificación de outfits</span>
-                </div>
-                <div className="flex items-center gap-2 justify-center">
-                  <Shirt className="w-4 h-4" />
-                  <span>Combinaciones programadas</span>
-                </div>
-                <div className="flex items-center gap-2 justify-center">
-                  <Plus className="w-4 h-4" />
-                  <span>Eventos especiales</span>
-                </div>
-              </div>
-
-              <Button 
-                variant="outline" 
-                className="mt-6"
-                disabled
-              >
-                Próximamente disponible
-              </Button>
-            </CardContent>
-          </Card>
+          <CalendarView onDayClick={handleDayClick} />
         </motion.div>
       </div>
     </div>

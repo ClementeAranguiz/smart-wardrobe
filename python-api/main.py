@@ -15,7 +15,7 @@ import numpy as np
 from sklearn.cluster import KMeans
 import cv2
 from collections import Counter
-import colorsys
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -72,41 +72,70 @@ climate2idx = None
 climates_matrix = None
 category_map = None
 nombre_map = None
+class_to_category = None
 
-RUTA_MODEL = 'C:/Users/diego/OneDrive/Documentos/USM/Vision Computer/Proyecto/SmartWardrove/AppSmartWardrove/smart-wardrobe/vit_clothes_prediction.pth'
+RUTA_MODEL = '../vit_clothes_prediction.pth'
 def load_model():
-    global model, processor, climate_data, class_names, classes, climate2idx, climates_matrix, category_map, nombre_map
+    global model, processor, climate_data, class_names, classes, climate2idx, climates_matrix, category_map, nombre_map, class_to_category
 
     try:
         logger.info("🤖 Cargando modelo custom...")
+        logger.info(f"📁 Cargando checkpoint desde: {RUTA_MODEL}")
 
         # Cargar checkpoint
         checkpoint = torch.load(RUTA_MODEL, map_location='cpu')
+        logger.info("✅ Checkpoint cargado exitosamente")
 
         # Extraer información del checkpoint
-        classes = checkpoint['classes'] # Lista de clases de prendas
-        class2idx = checkpoint['class2idx'] # Lista de clases de prendas
+        classes = checkpoint['category_classes'] # Lista de clases de prendas
+        class2idx = checkpoint['class2idx'] # Mapeo de clases de prendas
         climate2idx = checkpoint['climate2idx'] # Diccionario de climas (clima: índice)
-        climates_matrix = checkpoint['climates'] # Matriz de climas (categorías x climas)
-        category_map = checkpoint["category_map"] #Categorías de prendas como diccionario (superior, inferior, calzado)
-        nombre_map = checkpoint["nombre_map"] #Nombre en español de las prendas
+        num_climates = checkpoint['num_climates'] # Número de climas
+
+        # Crear mapeos adicionales que el código espera
+        category_map = {
+            "superior": ["blouse", "button-down", "cardigan", "flannel", "henley", "hoodie", "jacket", "jersey", "sweater", "tank", "tee", "top", "turtleneck", "blazer", "bomber", "coat", "parka", "peacoat"],
+            "inferior": ["capris", "chinos", "culottes", "cutoffs", "gauchos", "jeans", "jeggings", "jodhpurs", "joggers", "leggings", "shorts", "skirt", "sweatpants", "sweatshorts", "trunks"],
+            "calzado": ["boots", "sandals", "shoes", "slippers"],
+            "vestido": ["dress", "jumpsuit", "romper", "sundress"],
+            "abrigo": ["anorak", "caftan", "coverup", "kaftan", "kimono", "onesie", "poncho", "robe", "sarong"]
+        }
+
+        # Crear mapeo de nombres en español (simplificado)
+        nombre_map = {cls: cls.replace('-', ' ').title() for cls in classes}
+
+        # Crear mapeo inverso: clase -> categoría
+        class_to_category = {}
+        for categoria, clases_lista in category_map.items():
+            for clase in clases_lista:
+                if clase in classes:
+                    class_to_category[clase] = categoria
+
+        # Para clases que no están en el mapeo, asignar una categoría por defecto
+        for clase in classes:
+            if clase not in class_to_category:
+                class_to_category[clase] = "otros"
       
         # Crear modelo custom
+        logger.info(f"🏗️ Creando modelo con {len(classes)} categorías y {len(climate2idx)} climas...")
         model = ViTMultiTask(
             num_categories=len(classes),
             num_climates=len(climate2idx)
         )
+        logger.info("✅ Arquitectura del modelo creada")
 
         # Cargar pesos entrenados
+        logger.info("⚙️ Cargando pesos del modelo entrenado...")
         model.load_state_dict(checkpoint['model_state_dict'])
         model.eval()
-
-        logger.info("✅ Modelo custom cargado exitosamente!")
+        logger.info("✅ Pesos del modelo cargados exitosamente!")
 
         # Cargar procesador de imágenes
+        logger.info("📷 Cargando procesador de imágenes...")
         processor = ViTImageProcessor.from_pretrained('google/vit-base-patch16-224')
+        logger.info("✅ Procesador de imágenes cargado!")
 
-        logger.info("✅ Modelo y procesador cargados exitosamente")
+        logger.info("🎉 Modelo y procesador cargados exitosamente!")
 
     except Exception as e:
         logger.error(f"❌ Error cargando modelo: {e}")
@@ -130,46 +159,7 @@ def preprocess_image(image: Image.Image) -> torch.Tensor:
         raise
 
 
-def rgb_to_color_name(rgb):
-    """Convertir RGB a nombre de color en español"""
-    r, g, b = rgb
 
-    # Convertir a HSV para mejor análisis
-    h, s, v = colorsys.rgb_to_hsv(r/255.0, g/255.0, b/255.0)
-    h = h * 360  # Convertir a grados
-    s = s * 100  # Convertir a porcentaje
-    v = v * 100  # Convertir a porcentaje
-
-    # Definir rangos de colores
-    if v < 20:
-        return "negro"
-    elif v > 80 and s < 20:
-        return "blanco"
-    elif s < 20:
-        if v < 40:
-            return "gris oscuro"
-        elif v < 70:
-            return "gris"
-        else:
-            return "gris claro"
-
-    # Colores con saturación
-    if h < 15 or h >= 345:
-        return "rojo"
-    elif h < 45:
-        return "naranja"
-    elif h < 75:
-        return "amarillo"
-    elif h < 150:
-        return "verde"
-    elif h < 210:
-        return "azul"
-    elif h < 270:
-        return "morado"
-    elif h < 330:
-        return "rosa"
-    else:
-        return "rojo"
 
 def extract_clothing_colors(image: Image.Image, num_colors=3):
     """Extraer colores dominantes de una prenda evitando el fondo"""
@@ -237,9 +227,7 @@ def extract_clothing_colors(image: Image.Image, num_colors=3):
         color_info = []
         for i, color in enumerate(colors):
             frequency = label_counts[i] / len(labels)
-            color_name = rgb_to_color_name(color)
             color_info.append({
-                "nombre": color_name,
                 "rgb": color.tolist(),
                 "hex": "#{:02x}{:02x}{:02x}".format(color[0], color[1], color[2]),
                 "frecuencia": round(frequency, 3)
@@ -290,9 +278,14 @@ def recortar_fondo_perfil_blanco(pil_img: Image.Image) -> Image.Image:
 def predict_clothing(image: Image.Image) -> Dict[str, Any]:
     """Predecir tipo de prenda y clima usando el modelo custom"""
     try:
+        logger.info("🔄 Iniciando predict_clothing...")
         # Preprocesar imagen
+        logger.info("📷 Preprocesando imagen...")
         input_tensor = preprocess_image(image)
+        logger.info(f"✅ Imagen preprocesada. Shape: {input_tensor.shape}")
+
         # Hacer predicción
+        logger.info("🧠 Iniciando predicción con modelo...")
         with torch.no_grad():
           
             category_logits, climate_logits = model(input_tensor)
@@ -318,14 +311,14 @@ def predict_clothing(image: Image.Image) -> Dict[str, Any]:
 
                 if idx < len(classes):
                     class_name = classes[idx]
-                    categoria = category_map[class_name]
+                    categoria = class_to_category.get(class_name, "otros")
 
                     prediction = {
                         "clase": class_name,
                         "confianza": float(prob),
                         "nombre": nombre_map[class_name],
                         "categoria": categoria,
-                        "climas": []  
+                        "climas": []
                     }
                     all_predictions.append(prediction)
 
@@ -488,22 +481,23 @@ async def get_test_interface():
                                 ${pred.climas.map(clima => `<span class="tag">${clima}</span>`).join('')}
                             </div>
                             ${pred.colores ? `
-                                <div class="color-tags" style="margin-top: 10px;">
+                                <div class="color-circles" style="margin-top: 10px;">
                                     <strong>🎨 Colores:</strong>
-                                    ${pred.colores.map(color => `
-                                        <span class="color-tag" style="
-                                            display: inline-block;
-                                            margin: 2px;
-                                            padding: 4px 8px;
-                                            background: ${color.hex};
-                                            color: ${color.nombre === 'negro' || color.nombre.includes('oscuro') ? 'white' : 'black'};
-                                            border-radius: 12px;
-                                            font-size: 0.8em;
-                                            border: 1px solid #ddd;
-                                        ">
-                                            ${color.nombre} (${(color.frecuencia * 100).toFixed(0)}%)
-                                        </span>
-                                    `).join('')}
+                                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 5px;">
+                                        ${pred.colores.map(color => `
+                                            <div style="
+                                                width: 32px;
+                                                height: 32px;
+                                                border-radius: 50%;
+                                                background: ${color.hex};
+                                                border: 2px solid #ddd;
+                                                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                                                position: relative;
+                                                cursor: pointer;
+                                            " title="RGB: ${color.rgb.join(', ')} | HEX: ${color.hex} | ${(color.frecuencia * 100).toFixed(0)}%">
+                                            </div>
+                                        `).join('')}
+                                    </div>
                                 </div>
                             ` : ''}
                         </div>
