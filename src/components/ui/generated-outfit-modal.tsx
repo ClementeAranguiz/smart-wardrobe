@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ClothingCard } from '@/components/cards/ClothingCard';
 import { ColorDots } from '@/components/ui/color-display';
+import { PrioritySlider } from '@/components/ui/priority-slider';
 import { ClothingItem, ColorInfo } from '@/types/detections';
 
 interface GeneratedOutfitModalProps {
@@ -26,6 +27,8 @@ interface GeneratedOutfitModalProps {
   } | null;
   onRegenerate: () => void;
   onSaveOutfit?: (outfitName: string) => Promise<void>;
+  onPriorityChange?: (priority: number) => void;
+  currentPriority?: number;
   loading?: boolean;
 }
 
@@ -35,6 +38,8 @@ export const GeneratedOutfitModal: React.FC<GeneratedOutfitModalProps> = ({
   outfit,
   onRegenerate,
   onSaveOutfit,
+  onPriorityChange,
+  currentPriority = 50,
   loading = false
 }) => {
   const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -110,57 +115,15 @@ export const GeneratedOutfitModal: React.FC<GeneratedOutfitModalProps> = ({
           </div>
         ) : outfit ? (
           <div className="space-y-6">
-            {/* Scores y paleta de colores */}
+            {/* Slider de prioridad y paleta de colores */}
             <div className="grid grid-cols-1 gap-4">
-              {/* Scores */}
-              <Card>
-                <CardContent className="p-4">
-                  <h3 className="font-semibold mb-3 flex items-center gap-2">
-                    <Thermometer className="w-4 h-4" />
-                    Puntuación del Outfit
-                  </h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm">Clima:</span>
-                      <div className="flex items-center gap-2">
-                        <span className={`font-medium ${getScoreColor(outfit.score.climate)}`}>
-                          {formatScore(outfit.score.climate)}%
-                        </span>
-                        <Badge variant="outline" className="text-xs">
-                          {getScoreLabel(outfit.score.climate)}
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm">Colores:</span>
-                      <div className="flex items-center gap-2">
-                        <span className={`font-medium ${getScoreColor(outfit.score.color)}`}>
-                          {formatScore(outfit.score.color)}%
-                        </span>
-                        <Badge variant="outline" className="text-xs">
-                          {getScoreLabel(outfit.score.color)}
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className="border-t pt-2 mt-2">
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">General:</span>
-                        <div className="flex items-center gap-2">
-                          <span className={`font-bold text-lg ${getScoreColor(outfit.score.overall)}`}>
-                            {formatScore(outfit.score.overall)}%
-                          </span>
-                          <Badge 
-                            variant={outfit.score.overall >= 0.8 ? "default" : "outline"}
-                            className="text-xs"
-                          >
-                            {getScoreLabel(outfit.score.overall)}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Slider de prioridad */}
+              {onPriorityChange && (
+                <PrioritySlider
+                  value={currentPriority}
+                  onChange={onPriorityChange}
+                />
+              )}
 
               {/* Paleta de colores */}
               <Card>
@@ -171,9 +134,9 @@ export const GeneratedOutfitModal: React.FC<GeneratedOutfitModalProps> = ({
                   </h3>
                   {outfit.colorPalette.length > 0 ? (
                     <div className="space-y-3">
-                      <ColorDots 
-                        colors={outfit.colorPalette} 
-                        size="lg" 
+                      <ColorDots
+                        colors={outfit.colorPalette}
+                        size="lg"
                         maxColors={6}
                       />
                       <div className="text-xs text-muted-foreground">
@@ -185,6 +148,25 @@ export const GeneratedOutfitModal: React.FC<GeneratedOutfitModalProps> = ({
                       No hay información de colores disponible
                     </p>
                   )}
+                </CardContent>
+              </Card>
+
+              {/* Scores compactos */}
+              <Card className="border-dashed">
+                <CardContent className="p-3">
+                  <div className="flex justify-between items-center text-sm">
+                    <div className="flex items-center gap-2">
+                      <Thermometer className="w-3 h-3 text-blue-600" />
+                      <span>Clima: <span className={`font-medium ${getScoreColor(outfit.score.climate)}`}>{formatScore(outfit.score.climate)}%</span></span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Palette className="w-3 h-3 text-purple-600" />
+                      <span>Color: <span className={`font-medium ${getScoreColor(outfit.score.color)}`}>{formatScore(outfit.score.color)}%</span></span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span>Total: <span className={`font-bold ${getScoreColor(outfit.score.overall)}`}>{formatScore(outfit.score.overall)}%</span></span>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -229,13 +211,20 @@ export const GeneratedOutfitModal: React.FC<GeneratedOutfitModalProps> = ({
               <div className="flex gap-3">
                 <Button
                   variant="outline"
-                  onClick={onRegenerate}
+                  onClick={() => {
+                    console.log('🔄 Botón "Generar Otro" presionado');
+                    onRegenerate();
+                  }}
                   disabled={loading}
                   className="flex-1"
                 >
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  <span className="hidden sm:inline">Generar Otro</span>
-                  <span className="sm:hidden">Otro</span>
+                  <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline">
+                    {loading ? 'Generando...' : 'Generar Otro'}
+                  </span>
+                  <span className="sm:hidden">
+                    {loading ? '...' : 'Otro'}
+                  </span>
                 </Button>
                 {onSaveOutfit && (
                   <Button

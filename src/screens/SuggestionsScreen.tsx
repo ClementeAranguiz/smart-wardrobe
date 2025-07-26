@@ -7,6 +7,7 @@ import { ClothingCard } from '@/components/cards/ClothingCard';
 import { WeatherStatus } from '@/components/ui/weather-status';
 import { WeatherSettingsModal } from '@/components/ui/weather-settings-modal';
 import { GeneratedOutfitModal } from '@/components/ui/generated-outfit-modal';
+import { PrioritySlider } from '@/components/ui/priority-slider';
 import { OutfitGeneratorService } from '@/services/outfitGeneratorService';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useWardrobeContext } from '@/contexts/WardrobeContext';
@@ -44,6 +45,7 @@ export const SuggestionsScreen: React.FC = () => {
   const [showOutfitModal, setShowOutfitModal] = useState(false);
   const [generatedOutfit, setGeneratedOutfit] = useState<any>(null);
   const [generatingOutfit, setGeneratingOutfit] = useState(false);
+  const [outfitPriority, setOutfitPriority] = useState(50); // 0-100, 50 = balance
 
   const { getCurrentPosition, loading: geoLoading, error: geoError } = useGeolocation();
   const { items, getItemsByClimate } = useWardrobeContext();
@@ -186,26 +188,45 @@ export const SuggestionsScreen: React.FC = () => {
   };
 
   const generateOutfit = async () => {
-    if (!weather) return;
+    console.log('🎯 Generando outfit...', { weather: weather?.climate, itemsCount: items.length });
+
+    if (!weather) {
+      console.error('❌ No hay datos del clima');
+      return;
+    }
+
+    if (items.length === 0) {
+      console.error('❌ No hay prendas disponibles');
+      return;
+    }
 
     setGeneratingOutfit(true);
     setGeneratedOutfit(null); // Limpiar outfit anterior
 
     try {
       const includeCoat = OutfitGeneratorService.shouldIncludeCoat(weather.climate as ClimateType);
+      console.log('🧥 Incluir abrigo:', includeCoat);
 
       const outfit = OutfitGeneratorService.generateOutfit({
         climate: weather.climate as ClimateType,
         availableItems: items,
-        includeCoat
+        includeCoat,
+        colorWeight: outfitPriority / 100 // Convertir 0-100 a 0-1
       });
 
+      console.log('✅ Outfit generado:', outfit);
       setGeneratedOutfit(outfit);
-      setShowOutfitModal(true);
+
+      // Solo abrir el modal si no está ya abierto
+      if (!showOutfitModal) {
+        setShowOutfitModal(true);
+      }
     } catch (error) {
-      console.error('Error generating outfit:', error);
+      console.error('❌ Error generating outfit:', error);
       setGeneratedOutfit(null);
-      setShowOutfitModal(true);
+      if (!showOutfitModal) {
+        setShowOutfitModal(true);
+      }
     } finally {
       setGeneratingOutfit(false);
     }
@@ -238,6 +259,40 @@ export const SuggestionsScreen: React.FC = () => {
     }
   };
 
+  const handlePriorityChange = async (newPriority: number) => {
+    setOutfitPriority(newPriority);
+
+    // Regenerar outfit automáticamente con la nueva prioridad
+    if (weather && items.length > 0) {
+      await generateOutfitWithPriority(newPriority);
+    }
+  };
+
+  const generateOutfitWithPriority = async (priority: number) => {
+    if (!weather) return;
+
+    setGeneratingOutfit(true);
+    setGeneratedOutfit(null);
+
+    try {
+      const includeCoat = OutfitGeneratorService.shouldIncludeCoat(weather.climate as ClimateType);
+
+      const outfit = OutfitGeneratorService.generateOutfit({
+        climate: weather.climate as ClimateType,
+        availableItems: items,
+        includeCoat,
+        colorWeight: priority / 100
+      });
+
+      setGeneratedOutfit(outfit);
+    } catch (error) {
+      console.error('Error generating outfit with priority:', error);
+      setGeneratedOutfit(null);
+    } finally {
+      setGeneratingOutfit(false);
+    }
+  };
+
   useEffect(() => {
     if (items.length > 0) {
       fetchWeatherAndSuggestions();
@@ -262,7 +317,7 @@ export const SuggestionsScreen: React.FC = () => {
                 />
               </div>
               <p className="text-sm text-muted-foreground">
-                Outfit recomendado según el clima
+                Prendas recomendadas según el clima
               </p>
             </div>
 
@@ -458,7 +513,7 @@ export const SuggestionsScreen: React.FC = () => {
         ) : (
           <div className="p-4">
             <div className="mb-4">
-              <h2 className="text-lg font-semibold mb-2">Outfit Recomendado</h2>
+              <h2 className="text-lg font-semibold mb-2">Prendas Recomendadas</h2>
               <p className="text-sm text-muted-foreground">
                 {suggestions.length} {suggestions.length === 1 ? 'prenda recomendada' : 'prendas recomendadas'} para el clima actual
               </p>
@@ -548,6 +603,8 @@ export const SuggestionsScreen: React.FC = () => {
         outfit={generatedOutfit}
         onRegenerate={generateOutfit}
         onSaveOutfit={saveGeneratedOutfit}
+        onPriorityChange={handlePriorityChange}
+        currentPriority={outfitPriority}
         loading={generatingOutfit}
       />
     </div>

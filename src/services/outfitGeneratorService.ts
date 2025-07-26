@@ -16,6 +16,7 @@ interface OutfitRequirements {
   climate: ClimateType;
   availableItems: ClothingItem[];
   includeCoat?: boolean;
+  colorWeight?: number; // 0-1, donde 0 = solo clima, 1 = solo color, 0.5 = balance
 }
 
 export class OutfitGeneratorService {
@@ -37,7 +38,7 @@ export class OutfitGeneratorService {
    * Genera un outfit sugerido basado en clima y colores
    */
   static generateOutfit(requirements: OutfitRequirements): GeneratedOutfit | null {
-    const { climate, availableItems, includeCoat = false } = requirements;
+    const { climate, availableItems, includeCoat = false, colorWeight = 0.5 } = requirements;
 
     // 1. Filtrar prendas por clima (prioridad 2)
     const climateCompatibleItems = this.filterByClimate(availableItems, climate);
@@ -57,21 +58,44 @@ export class OutfitGeneratorService {
     // 4. Generar combinaciones posibles
     const possibleOutfits = this.generateCombinations(itemsByCategory, includeCoat);
 
+    console.log(`🎲 Generadas ${possibleOutfits.length} combinaciones posibles`);
+
     if (possibleOutfits.length === 0) {
       return null;
     }
 
     // 5. Evaluar cada combinación
-    const evaluatedOutfits = possibleOutfits.map(outfit => 
-      this.evaluateOutfit(outfit, climate)
+    const evaluatedOutfits = possibleOutfits.map(outfit =>
+      this.evaluateOutfit(outfit, climate, colorWeight)
     );
 
-    // 6. Seleccionar el mejor outfit
-    const bestOutfit = evaluatedOutfits.reduce((best, current) => 
-      current.score.overall > best.score.overall ? current : best
-    );
+    // 6. Filtrar outfits con score decente (>= 0.6)
+    const goodOutfits = evaluatedOutfits.filter(outfit => outfit.score.overall >= 0.6);
 
-    return bestOutfit;
+    // 7. Si hay buenos outfits, seleccionar uno aleatoriamente de los mejores
+    // Si no, tomar el mejor disponible
+    let selectedOutfit: GeneratedOutfit;
+
+    if (goodOutfits.length > 0) {
+      // Ordenar por score y tomar los top 3 (o menos si hay menos)
+      const topOutfits = goodOutfits
+        .sort((a, b) => b.score.overall - a.score.overall)
+        .slice(0, Math.min(3, goodOutfits.length));
+
+      // Seleccionar uno aleatoriamente de los mejores
+      const randomIndex = Math.floor(Math.random() * topOutfits.length);
+      selectedOutfit = topOutfits[randomIndex];
+      console.log(`🎯 Seleccionado outfit ${randomIndex + 1} de ${topOutfits.length} mejores (score: ${selectedOutfit.score.overall.toFixed(2)})`);
+    } else {
+      // Fallback: tomar el mejor outfit disponible
+      selectedOutfit = evaluatedOutfits.reduce((best, current) =>
+        current.score.overall > best.score.overall ? current : best
+      );
+      console.log(`⚠️ Seleccionado mejor outfit disponible (score: ${selectedOutfit.score.overall.toFixed(2)})`);
+    }
+
+    console.log(`👕 Outfit final: ${selectedOutfit.items.map(item => `${item.categoria}:${item.nombre}`).join(', ')}`);
+    return selectedOutfit;
   }
 
   /**
@@ -110,42 +134,70 @@ export class OutfitGeneratorService {
   }
 
   /**
-   * Genera todas las combinaciones posibles de outfit
+   * Mezcla un array aleatoriamente (Fisher-Yates shuffle)
+   */
+  private static shuffleArray<T>(array: T[]): T[] {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }
+
+  /**
+   * Selecciona elementos aleatorios de un array
+   */
+  private static getRandomItems<T>(array: T[], count: number): T[] {
+    const shuffled = this.shuffleArray(array);
+    return shuffled.slice(0, Math.min(count, array.length));
+  }
+
+  /**
+   * Genera combinaciones de outfit con variabilidad
    */
   private static generateCombinations(
-    itemsByCategory: Record<string, ClothingItem[]>, 
+    itemsByCategory: Record<string, ClothingItem[]>,
     includeCoat: boolean
   ): ClothingItem[][] {
     const combinations: ClothingItem[][] = [];
 
-    // Obtener una prenda de cada categoría requerida
-    const superiorItems = itemsByCategory['superior'] || [];
-    const inferiorItems = itemsByCategory['inferior'] || [];
-    const calzadoItems = itemsByCategory['calzado'] || [];
-    const abrigoItems = itemsByCategory['abrigo'] || [];
-    const accesorioItems = itemsByCategory['accesorio'] || [];
+    // Obtener prendas de cada categoría y mezclarlas para variabilidad
+    const superiorItems = this.shuffleArray(itemsByCategory['superior'] || []);
+    const inferiorItems = this.shuffleArray(itemsByCategory['inferior'] || []);
+    const calzadoItems = this.shuffleArray(itemsByCategory['calzado'] || []);
+    const abrigoItems = this.shuffleArray(itemsByCategory['abrigo'] || []);
+    const accesorioItems = this.shuffleArray(itemsByCategory['accesorio'] || []);
+
+    // Limitar el número de combinaciones para evitar explosión combinatoria
+    const maxItemsPerCategory = 3;
+    const limitedSuperior = superiorItems.slice(0, maxItemsPerCategory);
+    const limitedInferior = inferiorItems.slice(0, maxItemsPerCategory);
+    const limitedCalzado = calzadoItems.slice(0, maxItemsPerCategory);
 
     // Generar combinaciones básicas (superior + inferior + calzado)
-    for (const superior of superiorItems) {
-      for (const inferior of inferiorItems) {
-        for (const calzado of calzadoItems) {
+    for (const superior of limitedSuperior) {
+      for (const inferior of limitedInferior) {
+        for (const calzado of limitedCalzado) {
           const baseOutfit = [superior, inferior, calzado];
 
           // Agregar abrigo si es necesario y está disponible
           if (includeCoat && abrigoItems.length > 0) {
-            for (const abrigo of abrigoItems) {
-              const outfitWithCoat = [...baseOutfit, abrigo];
-              
-              // Opcionalmente agregar accesorio
-              if (accesorioItems.length > 0) {
-                combinations.push([...outfitWithCoat, accesorioItems[0]]);
-              }
-              combinations.push(outfitWithCoat);
+            // Seleccionar un abrigo aleatorio
+            const randomAbrigo = abrigoItems[Math.floor(Math.random() * abrigoItems.length)];
+            const outfitWithCoat = [...baseOutfit, randomAbrigo];
+
+            // Opcionalmente agregar accesorio (50% de probabilidad)
+            if (accesorioItems.length > 0 && Math.random() > 0.5) {
+              const randomAccesorio = accesorioItems[Math.floor(Math.random() * accesorioItems.length)];
+              combinations.push([...outfitWithCoat, randomAccesorio]);
             }
+            combinations.push(outfitWithCoat);
           } else {
-            // Opcionalmente agregar accesorio sin abrigo
-            if (accesorioItems.length > 0) {
-              combinations.push([...baseOutfit, accesorioItems[0]]);
+            // Opcionalmente agregar accesorio sin abrigo (30% de probabilidad)
+            if (accesorioItems.length > 0 && Math.random() > 0.7) {
+              const randomAccesorio = accesorioItems[Math.floor(Math.random() * accesorioItems.length)];
+              combinations.push([...baseOutfit, randomAccesorio]);
             }
             combinations.push(baseOutfit);
           }
@@ -153,23 +205,29 @@ export class OutfitGeneratorService {
       }
     }
 
-    return combinations;
+    // Mezclar las combinaciones para mayor variabilidad
+    return this.shuffleArray(combinations);
   }
 
   /**
    * Evalúa un outfit completo
    */
-  private static evaluateOutfit(items: ClothingItem[], climate: ClimateType): GeneratedOutfit {
-    // Evaluar compatibilidad climática (prioridad 2: 50%)
+  private static evaluateOutfit(items: ClothingItem[], climate: ClimateType, colorWeight: number = 0.5): GeneratedOutfit {
+    // Evaluar compatibilidad climática
     const climateScore = this.evaluateClimateCompatibility(items, climate);
 
-    // Evaluar compatibilidad de colores (prioridad 3: 50%)
+    // Evaluar compatibilidad de colores
     const colorEvaluation = ColorHarmonyService.evaluateOutfitCompatibility(
       items.map(item => ({ colors: item.colores }))
     );
 
-    // Calcular score general (50% clima, 50% colores)
-    const overallScore = (climateScore * 0.5) + (colorEvaluation.overallScore * 0.5);
+    // Calcular pesos dinámicos
+    const climateWeight = 1 - colorWeight;
+
+    // Calcular score general con pesos personalizados
+    const overallScore = (climateScore * climateWeight) + (colorEvaluation.overallScore * colorWeight);
+
+    console.log(`⚖️ Pesos: Clima ${(climateWeight * 100).toFixed(0)}% | Color ${(colorWeight * 100).toFixed(0)}% | Scores: C=${climateScore.toFixed(2)} Co=${colorEvaluation.overallScore.toFixed(2)} → ${overallScore.toFixed(2)}`);
 
     // Generar explicación
     const explanation = this.generateExplanation(items, climateScore, colorEvaluation);
